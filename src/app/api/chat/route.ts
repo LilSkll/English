@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { chatTutor } from '@/lib/openai'
 import { ChatSession } from '@/lib/supabase'
 
 // In-memory storage for chat sessions
@@ -16,6 +15,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Check if OpenAI API key is available
+    if (!process.env.OPENAI_API_KEY) {
+      return NextResponse.json(
+        { error: 'OpenAI API key not configured' },
+        { status: 500 }
+      )
+    }
+
+    // Dynamically import chatTutor to avoid build-time issues
+    const { chatTutor } = await import('@/lib/openai')
+    
     // Get AI response
     const aiResponse = await chatTutor(message)
 

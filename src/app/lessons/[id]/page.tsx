@@ -10,7 +10,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ArrowLeft, ArrowRight, CheckCircle, BookOpen, Lightbulb, Volume2 } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from '@/components/ui/use-toast'
-import { explainGrammarMistake, generateExtraExamples } from '@/lib/openai'
 
 interface Exercise {
   type: 'fill_blank' | 'multiple_choice' | 'sentence_correction' | 'rewrite' | 'match'
@@ -130,6 +129,7 @@ export default function LessonPage() {
     if (!lesson || !userAnswer) return
     
     const correctAnswer = exercise.answer || exercise.correct || ''
+    const { explainGrammarMistake } = await import('@/lib/openai')
     const explanation = await explainGrammarMistake(userAnswer, correctAnswer, lesson.title)
     setGrammarExplanation(explanation)
     setShowHint(true)
@@ -138,6 +138,7 @@ export default function LessonPage() {
   const loadExtraExamples = async () => {
     if (!lesson) return
     
+    const { generateExtraExamples } = await import('@/lib/openai')
     const examples = await generateExtraExamples(lesson.title, 3)
     setExtraExamples(examples)
   }
