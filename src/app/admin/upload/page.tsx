@@ -1,11 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Upload, FileText, CheckCircle, AlertCircle } from 'lucide-react'
-import { PDFParser } from '@/lib/pdf-parser'
 import { toast } from '@/components/ui/use-toast'
 
 export default function AdminUpload() {
@@ -13,6 +12,16 @@ export default function AdminUpload() {
   const [progress, setProgress] = useState(0)
   const [status, setStatus] = useState<'idle' | 'uploading' | 'parsing' | 'saving' | 'success' | 'error'>('idle')
   const [parsedUnits, setParsedUnits] = useState<any[]>([])
+  const [parserLoaded, setParserLoaded] = useState(false)
+
+  useEffect(() => {
+    // Dynamically import PDF parser only on client side
+    import('@/lib/pdf-parser').then(() => {
+      setParserLoaded(true)
+    }).catch(() => {
+      setParserLoaded(false)
+    })
+  }, [])
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -20,6 +29,15 @@ export default function AdminUpload() {
       toast({
         title: 'Invalid file',
         description: 'Please upload a PDF file',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    if (!parserLoaded) {
+      toast({
+        title: 'Error',
+        description: 'PDF parser not loaded',
         variant: 'destructive'
       })
       return
@@ -39,7 +57,8 @@ export default function AdminUpload() {
       setStatus('parsing')
       setProgress(40)
 
-      // Parse the PDF
+      // Dynamically import and use PDF parser
+      const { PDFParser } = await import('@/lib/pdf-parser')
       const lessons = await PDFParser.parsePDFWithAI(file)
       setParsedUnits(lessons)
       
@@ -151,18 +170,18 @@ export default function AdminUpload() {
                 type="file"
                 accept=".pdf"
                 onChange={handleFileUpload}
-                disabled={uploading}
+                disabled={uploading || !parserLoaded}
                 className="hidden"
                 id="pdf-upload"
               />
               
               <Button
                 asChild
-                disabled={uploading}
+                disabled={uploading || !parserLoaded}
                 className="mt-4"
               >
                 <label htmlFor="pdf-upload" className="cursor-pointer">
-                  {uploading ? 'Processing...' : 'Choose PDF File'}
+                  {uploading ? 'Processing...' : parserLoaded ? 'Choose PDF File' : 'Loading...'}
                 </label>
               </Button>
             </div>

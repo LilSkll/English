@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react"
+'use client'
 
+import { useEffect, useState } from "react"
 import type {
   ToastActionElement,
   ToastProps,
@@ -87,7 +88,7 @@ export const reducer = (state: State, action: Action): State => {
         ),
       }
 
-    case "DISMISS_TOAST": {
+    case "DISMISS_TOAST":
       const { toastId } = action
 
       if (toastId) {
@@ -109,7 +110,7 @@ export const reducer = (state: State, action: Action): State => {
             : t
         ),
       }
-    }
+
     case "REMOVE_TOAST":
       if (action.toastId === undefined) {
         return {
@@ -117,6 +118,7 @@ export const reducer = (state: State, action: Action): State => {
           toasts: [],
         }
       }
+
       return {
         ...state,
         toasts: state.toasts.filter((t) => t.id !== action.toastId),
@@ -145,6 +147,7 @@ function toast({ ...props }: Toast) {
       type: "UPDATE_TOAST",
       toast: { ...props, id },
     })
+
   const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id })
 
   dispatch({
