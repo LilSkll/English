@@ -1,0 +1,273 @@
+import * as pdfjsLib from 'pdfjs-dist'
+import { Exercise, Lesson } from './openai'
+
+// Configure PDF.js worker
+if (typeof window !== 'undefined') {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf-js/${pdfjsLib.version}/pdf.worker.min.js`
+}
+
+export interface ParsedUnit {
+  unit: number
+  title: string
+  explanation: string
+  examples: string[]
+  exercises: Exercise[]
+  rawText: string
+}
+
+export class PDFParser {
+  private static readonly UNIT_PATTERN = /Unit\s+(\d+)/gi
+  private static readonly GRAMMAR_BOX_PATTERN = /Grammar\s*Box|Grammar\s*box/gi
+  private static readonly EXAMPLE_PATTERN = /(?:For\s+example|Examples?|e\.g\.|For\s+instance)[:\.\n]/gi
+  private static readonly EXERCISE_PATTERNS = {
+    fill_blank: /_+|\(\s*\)|\[\s*\]/gi,
+    multiple_choice: /\([a-d]\)|[A-D]\)/gi,
+    rewrite: /Rewrite|Correct|Change/gi,
+    match: /Match|Connect/gi,
+    correction: /Correct\s+the\s+mistake|Find\s+the\s+error/gi
+  }
+
+  static async parsePDF(file: File): Promise<ParsedUnit[]> {
+    try {
+      const arrayBuffer = await file.arrayBuffer()
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+      const fullText = await this.extractFullText(pdf)
+      
+      return this.parseUnitsFromText(fullText)
+    } catch (error) {
+      console.error('Error parsing PDF:', error)
+      throw new Error('Failed to parse PDF file')
+    }
+  }
+
+  private static async extractFullText(pdf: any): Promise<string> {
+    let fullText = ''
+    
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      const page = await pdf.getPage(pageNum)
+      const textContent = await page.getTextContent()
+      const pageText = textContent.items
+        .map((item: any) => item.str)
+        .join(' ')
+      fullText += pageText + '\n'
+    }
+    
+    return fullText
+  }
+
+  private static parseUnitsFromText(fullText: string): ParsedUnit[] {
+    const units: ParsedUnit[] = []
+    const unitSections = this.splitIntoUnits(fullText)
+    
+    for (const section of unitSections) {
+      const unit = this.parseUnitSection(section)
+      if (unit) {
+        units.push(unit)
+      }
+    }
+    
+    return units
+  }
+
+  private static splitIntoUnits(text: string): string[] {
+    const sections: string[] = []
+    let currentSection = ''
+    let currentUnit = 0
+    
+    const lines = text.split('\n')
+    
+    for (const line of lines) {
+      const unitMatch = line.match(this.UNIT_PATTERN)
+      
+      if (unitMatch) {
+        if (currentSection.trim()) {
+          sections.push(currentSection.trim())
+        }
+        currentSection = line
+        currentUnit = parseInt(unitMatch[1])
+      } else if (currentUnit > 0) {
+        currentSection += '\n' + line
+      }
+    }
+    
+    if (currentSection.trim()) {
+      sections.push(currentSection.trim())
+    }
+    
+    return sections
+  }
+
+  private static parseUnitSection(sectionText: string): ParsedUnit | null {
+    const unitMatch = sectionText.match(this.UNIT_PATTERN)
+    if (!unitMatch) return null
+    
+    const unit = parseInt(unitMatch[1])
+    const lines = sectionText.split('\n').filter(line => line.trim())
+    
+    // Extract title (usually after Unit X)
+    let title = `Unit ${unit}`
+    for (let i = 0; i < Math.min(3, lines.length); i++) {
+      if (lines[i].includes('Unit') && lines[i + 1]) {
+        title = lines[i + 1].trim()
+        break
+      }
+    }
+    
+    // Extract explanation (Grammar Box content)
+    const explanation = this.extractExplanation(sectionText)
+    
+    // Extract examples
+    const examples = this.extractExamples(sectionText)
+    
+    // Extract exercises
+    const exercises = this.extractExercises(sectionText)
+    
+    return {
+      unit,
+      title,
+      explanation,
+      examples,
+      exercises,
+      rawText: sectionText
+    }
+  }
+
+  private static extractExplanation(text: string): string {
+    const grammarBoxMatch = text.match(/Grammar\s*Box.*?(?=Examples?|Exercise|\n\n|$)/gi)
+    if (grammarBoxMatch) {
+      return grammarBoxMatch[0].replace(/Grammar\s*Box/gi, '').trim()
+    }
+    
+    // Fallback: Look for content between Unit title and examples
+    const lines = text.split('\n')
+    let explanationStart = -1
+    
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].match(this.UNIT_PATTERN) && i + 1 < lines.length) {
+        explanationStart = i + 2 // Skip unit line and title
+        break
+      }
+    }
+    
+    if (explanationStart >= 0) {
+      let explanation = ''
+      for (let i = explanationStart; i < lines.length; i++) {
+        const line = lines[i].trim()
+        if (line.match(this.EXAMPLE_PATTERN) || line.toLowerCase().includes('exercise')) {
+          break
+        }
+        if (line) {
+          explanation += line + ' '
+        }
+      }
+      return explanation.trim()
+    }
+    
+    return 'Grammar explanation will be added here.'
+  }
+
+  private static extractExamples(text: string): string[] {
+    const examples: string[] = []
+    const lines = text.split('\n')
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim()
+      
+      if (line.match(this.EXAMPLE_PATTERN)) {
+        // Look for example sentences after the marker
+        for (let j = i + 1; j < Math.min(i + 6, lines.length); j++) {
+          const exampleLine = lines[j].trim()
+          if (exampleLine && !exampleLine.toLowerCase().includes('exercise') && 
+              !exampleLine.match(this.UNIT_PATTERN) && 
+              exampleLine.length > 5 && exampleLine.length < 100) {
+            examples.push(exampleLine)
+          }
+        }
+      }
+    }
+    
+    // Fallback: Look for sentences that look like examples
+    if (examples.length === 0) {
+      for (const line of lines) {
+        if (line.includes('.') && line.length > 10 && line.length < 80 && 
+            !line.toLowerCase().includes('exercise') && 
+            !line.match(this.UNIT_PATTERN)) {
+          examples.push(line.trim())
+        }
+      }
+    }
+    
+    return examples.slice(0, 5) // Limit to 5 examples
+  }
+
+  private static extractExercises(text: string): Exercise[] {
+    const exercises: Exercise[] = []
+    const lines = text.split('\n')
+    
+    for (const line of lines) {
+      const trimmedLine = line.trim()
+      
+      // Fill in the blanks
+      if (trimmedLine.match(this.EXERCISE_PATTERNS.fill_blank)) {
+        exercises.push({
+          type: 'fill_blank',
+          question: trimmedLine,
+          answer: '' // Will need manual/AI filling
+        })
+      }
+      
+      // Multiple choice (basic detection)
+      if (trimmedLine.includes('(') && trimmedLine.includes(')') && 
+          (trimmedLine.includes('a)') || trimmedLine.includes('b)'))) {
+        exercises.push({
+          type: 'multiple_choice',
+          question: trimmedLine,
+          options: [], // Will need parsing
+          correct: ''
+        })
+      }
+      
+      // Sentence correction
+      if (trimmedLine.match(this.EXERCISE_PATTERNS.correction)) {
+        exercises.push({
+          type: 'sentence_correction',
+          question: trimmedLine,
+          answer: ''
+        })
+      }
+    }
+    
+    return exercises
+  }
+
+  static async parsePDFWithAI(file: File): Promise<Lesson[]> {
+    const parsedUnits = await this.parsePDF(file)
+    const lessons: Lesson[] = []
+    
+    for (const unit of parsedUnits) {
+      // If exercises are incomplete, generate them with AI
+      if (unit.exercises.length < 5) {
+        const { generateExercises } = await import('./openai')
+        const aiExercises = await generateExercises(unit.title, unit.unit)
+        
+        lessons.push({
+          unit: unit.unit,
+          title: unit.title,
+          explanation: unit.explanation,
+          examples: unit.examples,
+          exercises: aiExercises.length > 0 ? aiExercises : unit.exercises
+        })
+      } else {
+        lessons.push({
+          unit: unit.unit,
+          title: unit.title,
+          explanation: unit.explanation,
+          examples: unit.examples,
+          exercises: unit.exercises
+        })
+      }
+    }
+    
+    return lessons
+  }
+}
