@@ -34,6 +34,17 @@ export default function AdminUpload() {
       return
     }
 
+    // Add file size check (50MB limit to prevent crashes)
+    const maxSize = 50 * 1024 * 1024 // 50MB
+    if (file.size > maxSize) {
+      toast({
+        title: 'File too large',
+        description: 'Please upload a PDF file smaller than 50MB',
+        variant: 'destructive'
+      })
+      return
+    }
+
     if (!parserLoaded) {
       toast({
         title: 'Error',
@@ -48,65 +59,114 @@ export default function AdminUpload() {
     setProgress(0)
 
     try {
-      // Simulate upload progress
+      // Add memory management
+      console.log('=== Starting Safe PDF Upload Process ===')
+      console.log('File:', file.name, 'Size:', (file.size / 1024 / 1024).toFixed(2) + 'MB')
+      
+      // Clear any previous data to free memory
+      setParsedUnits([])
+      
+      // Simulate upload progress with smaller steps
       for (let i = 0; i <= 30; i++) {
-        await new Promise(resolve => setTimeout(resolve, 50))
+        await new Promise(resolve => setTimeout(resolve, 30)) // Reduced timeout
         setProgress(i)
+        
+        // Add memory check every 10 steps
+        if (i % 10 === 0) {
+          if (performance && (performance as any).memory) {
+            const memoryUsage = (performance as any).memory.usedJSHeapSize / 1024 / 1024
+            console.log(`Memory usage: ${memoryUsage.toFixed(2)}MB`)
+            
+            // Warn if memory usage is high
+            if (memoryUsage > 500) { // 500MB warning threshold
+              console.warn('High memory usage detected, consider using smaller files')
+            }
+          }
+        }
       }
 
       setStatus('parsing')
       setProgress(40)
 
-      // Dynamically import and use PDF parser
+      // Dynamically import and use PDF parser with error boundaries
       let lessons: any[] = []
       try {
-        console.log('=== Starting PDF Upload Process ===')
-        console.log('File:', file.name, 'Size:', file.size)
-        
+        console.log('Importing PDFParser...')
         const { PDFParser } = await import('@/lib/pdf-parser')
         console.log('PDFParser imported successfully')
         
-        lessons = await PDFParser.parsePDFWithAI(file)
+        // Add timeout to prevent infinite hanging
+        const parsePromise = PDFParser.parsePDFWithAI(file)
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('PDF parsing timeout - file may be too large')), 60000) // 60 second timeout
+        )
+        
+        lessons = await Promise.race([parsePromise, timeoutPromise]) as any[]
         console.log('=== PDF Parsing Completed ===')
         console.log('Lessons created:', lessons.length)
+        
+        if (!lessons || lessons.length === 0) {
+          throw new Error('No lessons could be extracted from the PDF')
+        }
         
         setParsedUnits(lessons)
       } catch (error) {
         console.error('=== PDF Parsing Failed ===')
         console.error('Error:', error)
+        
+        // Provide specific error messages
+        if (error instanceof Error) {
+          if (error.message.includes('timeout')) {
+            throw new Error('PDF parsing took too long. Try a smaller PDF or check file format.')
+          } else if (error.message.includes('memory')) {
+            throw new Error('Not enough memory to process this PDF. Try a smaller file.')
+          } else if (error.message.includes('Failed to parse')) {
+            throw new Error('PDF file may be corrupted or not supported. Try a different PDF.')
+          }
+        }
+        
         throw new Error(`PDF parsing failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
       }
       
       setProgress(70)
       setStatus('saving')
 
-      // Save to database via API
+      // Save to database via API with error handling
       console.log('=== Starting Database Save ===')
       for (let i = 0; i < lessons.length; i++) {
         console.log(`Saving lesson ${i + 1}/${lessons.length}`)
         const lesson = lessons[i]
         
-        const response = await fetch('/api/lessons', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            unit: lesson.unit,
-            title: lesson.title,
-            explanation: lesson.explanation,
-            examples: lesson.examples,
-            exercises: lesson.exercises
+        try {
+          const response = await fetch('/api/lessons', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              unit: lesson.unit,
+              title: lesson.title,
+              explanation: lesson.explanation,
+              examples: lesson.examples,
+              exercises: lesson.exercises
+            })
           })
-        })
 
-        if (!response.ok) {
-          throw new Error('Failed to save lesson')
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}))
+            throw new Error(errorData.error || 'Failed to save lesson')
+          }
+        } catch (saveError) {
+          console.error(`Failed to save lesson ${i + 1}:`, saveError)
+          throw new Error(`Failed to save lesson ${i + 1}: ${saveError instanceof Error ? saveError.message : 'Unknown error'}`)
         }
 
         // Update progress for each lesson saved
         const progressValue = 70 + (30 * (i + 1) / lessons.length)
         setProgress(progressValue)
+        
+        // Add small delay to prevent overwhelming the browser
+        await new Promise(resolve => setTimeout(resolve, 100))
       }
       
       console.log('=== All Lessons Saved Successfully ===')
@@ -123,13 +183,24 @@ export default function AdminUpload() {
       console.error('=== Upload Process Failed ===')
       console.error('Error:', error)
       setStatus('error')
+      
+      // Show user-friendly error messages
+      let errorMessage = 'An error occurred during upload'
+      if (error instanceof Error) {
+        errorMessage = error.message
+      }
+      
       toast({
         title: 'Upload failed',
-        description: error instanceof Error ? error.message : 'An error occurred',
+        description: errorMessage,
         variant: 'destructive'
       })
     } finally {
       setUploading(false)
+      // Force garbage collection if available
+      if (window.gc) {
+        window.gc()
+      }
     }
   }
 
