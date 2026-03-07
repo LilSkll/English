@@ -60,13 +60,20 @@ export default function AdminUpload() {
       // Dynamically import and use PDF parser
       let lessons: any[] = []
       try {
+        console.log('=== Starting PDF Upload Process ===')
+        console.log('File:', file.name, 'Size:', file.size)
+        
         const { PDFParser } = await import('@/lib/pdf-parser')
-        console.log('Starting PDF parsing...')
+        console.log('PDFParser imported successfully')
+        
         lessons = await PDFParser.parsePDFWithAI(file)
-        console.log('PDF parsing completed, lessons:', lessons.length)
+        console.log('=== PDF Parsing Completed ===')
+        console.log('Lessons created:', lessons.length)
+        
         setParsedUnits(lessons)
       } catch (error) {
-        console.error('PDF parsing error:', error)
+        console.error('=== PDF Parsing Failed ===')
+        console.error('Error:', error)
         throw new Error(`PDF parsing failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
       }
       
@@ -74,7 +81,9 @@ export default function AdminUpload() {
       setStatus('saving')
 
       // Save to database via API
+      console.log('=== Starting Database Save ===')
       for (let i = 0; i < lessons.length; i++) {
+        console.log(`Saving lesson ${i + 1}/${lessons.length}`)
         const lesson = lessons[i]
         
         const response = await fetch('/api/lessons', {
@@ -99,6 +108,8 @@ export default function AdminUpload() {
         const progressValue = 70 + (30 * (i + 1) / lessons.length)
         setProgress(progressValue)
       }
+      
+      console.log('=== All Lessons Saved Successfully ===')
 
       setStatus('success')
       setProgress(100)
@@ -109,7 +120,8 @@ export default function AdminUpload() {
       })
 
     } catch (error) {
-      console.error('Upload error:', error)
+      console.error('=== Upload Process Failed ===')
+      console.error('Error:', error)
       setStatus('error')
       toast({
         title: 'Upload failed',

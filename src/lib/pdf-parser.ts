@@ -36,27 +36,46 @@ export class PDFParser {
 
   static async parsePDF(file: File): Promise<ParsedUnit[]> {
     try {
+      console.log('Starting PDF text extraction...')
       const arrayBuffer = await file.arrayBuffer()
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
-      const fullText = await this.extractFullText(pdf)
+      console.log('PDF loaded, size:', arrayBuffer.byteLength)
       
-      return this.parseUnitsFromText(fullText)
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+      console.log('PDF document opened, pages:', pdf.numPages)
+      
+      const fullText = await this.extractFullText(pdf)
+      console.log('Text extraction completed, length:', fullText.length)
+      
+      console.log('Starting unit parsing...')
+      const units = this.parseUnitsFromText(fullText)
+      console.log('Unit parsing completed, units found:', units.length)
+      
+      return units
     } catch (error) {
       console.error('Error parsing PDF:', error)
-      throw new Error('Failed to parse PDF file')
+      throw new Error(`Failed to parse PDF file: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 
   private static async extractFullText(pdf: any): Promise<string> {
     let fullText = ''
     
-    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-      const page = await pdf.getPage(pageNum)
-      const textContent = await page.getTextContent()
-      const pageText = textContent.items
-        .map((item: any) => item.str)
-        .join(' ')
-      fullText += pageText + '\n'
+    try {
+      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+        if (pageNum % 5 === 1) {
+          console.log(`Extracting text from page ${pageNum}/${pdf.numPages}`)
+        }
+        
+        const page = await pdf.getPage(pageNum)
+        const textContent = await page.getTextContent()
+        const pageText = textContent.items
+          .map((item: any) => item.str)
+          .join(' ')
+        fullText += pageText + '\n'
+      }
+    } catch (error) {
+      console.error('Error extracting text from PDF:', error)
+      throw error
     }
     
     return fullText
