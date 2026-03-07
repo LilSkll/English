@@ -1,9 +1,16 @@
 import * as pdfjsLib from 'pdfjs-dist'
 import { Exercise, Lesson } from './openai'
 
-// Configure PDF.js worker
+// Configure PDF.js worker for Next.js compatibility
 if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf-js/${pdfjsLib.version}/pdf.worker.min.js`
+  try {
+    // Try unpkg CDN first
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`
+  } catch (error) {
+    console.warn('Failed to set PDF worker from CDN, using fallback')
+    // Fallback to jsdelivr
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`
+  }
 }
 
 export interface ParsedUnit {
