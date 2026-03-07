@@ -58,9 +58,17 @@ export default function AdminUpload() {
       setProgress(40)
 
       // Dynamically import and use PDF parser
-      const { PDFParser } = await import('@/lib/pdf-parser')
-      const lessons = await PDFParser.parsePDFWithAI(file)
-      setParsedUnits(lessons)
+      let lessons: any[] = []
+      try {
+        const { PDFParser } = await import('@/lib/pdf-parser')
+        console.log('Starting PDF parsing...')
+        lessons = await PDFParser.parsePDFWithAI(file)
+        console.log('PDF parsing completed, lessons:', lessons.length)
+        setParsedUnits(lessons)
+      } catch (error) {
+        console.error('PDF parsing error:', error)
+        throw new Error(`PDF parsing failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      }
       
       setProgress(70)
       setStatus('saving')

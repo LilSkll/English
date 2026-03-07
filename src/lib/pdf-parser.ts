@@ -241,33 +241,71 @@ export class PDFParser {
   }
 
   static async parsePDFWithAI(file: File): Promise<Lesson[]> {
-    const parsedUnits = await this.parsePDF(file)
-    const lessons: Lesson[] = []
-    
-    for (const unit of parsedUnits) {
-      // If exercises are incomplete, generate them with AI
-      if (unit.exercises.length < 5) {
-        const { generateExercises } = await import('./openai')
-        const aiExercises = await generateExercises(unit.title, unit.unit)
+    try {
+      console.log('Starting PDF parsing...')
+      const parsedUnits = await this.parsePDF(file)
+      console.log('PDF parsed, units found:', parsedUnits.length)
+      
+      const lessons: Lesson[] = []
+      
+      for (let i = 0; i < parsedUnits.length; i++) {
+        const unit = parsedUnits[i]
+        console.log(`Processing unit ${i + 1}/${parsedUnits.length}: ${unit.title}`)
         
-        lessons.push({
-          unit: unit.unit,
-          title: unit.title,
-          explanation: unit.explanation,
-          examples: unit.examples,
-          exercises: aiExercises.length > 0 ? aiExercises : unit.exercises
-        })
-      } else {
-        lessons.push({
-          unit: unit.unit,
-          title: unit.title,
-          explanation: unit.explanation,
-          examples: unit.examples,
-          exercises: unit.exercises
-        })
+        try {
+          // Always use original exercises first, skip AI generation for reliability
+          lessons.push({
+            unit: unit.unit,
+            title: unit.title,
+            explanation: unit.explanation,
+            examples: unit.examples,
+            exercises: unit.exercises
+          })
+          
+          // Optional: Try AI generation in background but don't fail if it doesn't work
+          if (unit.exercises.length < 3) {
+            try {
+              console.log('Attempting to generate AI exercises for unit:', unit.title)
+              
+              // Add timeout for AI generation
+              const aiPromise = import('./openai').then(({ generateExercises }) => 
+                generateExercises(unit.title, unit.unit)
+              )
+              
+              const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('AI generation timeout')), 10000) // Reduced timeout
+              )
+              
+              const aiExercises = await Promise.race([aiPromise, timeoutPromise]) as Exercise[]
+              
+              // If AI generation succeeded, replace exercises
+              if (aiExercises.length > 0) {
+                lessons[lessons.length - 1].exercises = aiExercises
+                console.log('AI exercises generated successfully')
+              }
+            } catch (aiError) {
+              console.log('AI generation failed, using original exercises:', aiError)
+              // Keep original exercises, don't fail the whole process
+            }
+          }
+        } catch (error) {
+          console.error(`Error processing unit ${unit.unit}:`, error)
+          // Add unit anyway with original exercises
+          lessons.push({
+            unit: unit.unit,
+            title: unit.title,
+            explanation: unit.explanation,
+            examples: unit.examples,
+            exercises: unit.exercises
+          })
+        }
       }
+      
+      console.log('Completed processing all units')
+      return lessons
+    } catch (error) {
+      console.error('PDF parsing failed:', error)
+      throw new Error(`PDF parsing failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
-    
-    return lessons
   }
 }
