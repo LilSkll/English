@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getLessons, saveLesson, Lesson } from '@/lib/supabase'
+import { getAllLessons } from '@/lib/lessons-data'
+import { Lesson } from '@/lib/supabase'
 
-// In-memory storage for server-side (since localStorage doesn't work in API routes)
-let serverLessons: Lesson[] = []
-
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    // Return lessons from server storage
-    return NextResponse.json(serverLessons.sort((a, b) => a.unit - b.unit))
+    // Return pre-built lessons from the New Round-Up Starter book
+    const lessons = getAllLessons()
+    return NextResponse.json(lessons)
   } catch (error) {
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Failed to fetch lessons' },
       { status: 500 }
     )
   }
@@ -20,23 +19,20 @@ export async function POST(request: NextRequest) {
   try {
     const lessonData = await request.json()
     
-    // Save to server storage
-    const newLesson = {
-      ...lessonData,
-      id: Date.now().toString(),
+    // For now, we'll just return the lesson data since we're using pre-built content
+    // In a real app, you might want to save custom lessons or user progress
+    const newLesson: Lesson = {
+      id: `custom-${Date.now()}`,
+      unit: lessonData.unit || 0,
+      title: lessonData.title || 'Custom Lesson',
+      explanation: lessonData.explanation || '',
+      examples: lessonData.examples || [],
+      exercises: lessonData.exercises || [],
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     }
-    
-    // Check if lesson with same unit exists
-    const existingIndex = serverLessons.findIndex(l => l.unit === lessonData.unit)
-    if (existingIndex >= 0) {
-      serverLessons[existingIndex] = newLesson
-    } else {
-      serverLessons.push(newLesson)
-    }
-    
-    return NextResponse.json(newLesson, { status: 201 })
+
+    return NextResponse.json(newLesson)
   } catch (error) {
     return NextResponse.json(
       { error: 'Internal server error' },

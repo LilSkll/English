@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getLessonById } from '@/lib/lessons-data'
 import { Lesson } from '@/lib/supabase'
-
-// In-memory storage (same as in the main lessons route)
-let serverLessons: Lesson[] = []
 
 export async function GET(
   request: NextRequest,
@@ -10,7 +8,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const lesson = serverLessons.find(l => l.id === id)
+    const lesson = getLessonById(id)
     
     if (!lesson) {
       return NextResponse.json({ error: 'Lesson not found' }, { status: 404 })
@@ -32,19 +30,23 @@ export async function PUT(
   try {
     const { id } = await params
     const updates = await request.json()
-    const lessonIndex = serverLessons.findIndex(l => l.id === id)
     
-    if (lessonIndex === -1) {
+    // Get the original lesson
+    const lesson = getLessonById(id)
+    
+    if (!lesson) {
       return NextResponse.json({ error: 'Lesson not found' }, { status: 404 })
     }
 
-    serverLessons[lessonIndex] = {
-      ...serverLessons[lessonIndex],
+    // For now, we'll just return the updated lesson data
+    // In a real app, you might want to save the updates
+    const updatedLesson: Lesson = {
+      ...lesson,
       ...updates,
       updated_at: new Date().toISOString()
     }
 
-    return NextResponse.json(serverLessons[lessonIndex])
+    return NextResponse.json(updatedLesson)
   } catch (error) {
     return NextResponse.json(
       { error: 'Internal server error' },
@@ -59,14 +61,18 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-    const lessonIndex = serverLessons.findIndex(l => l.id === id)
+    const lesson = getLessonById(id)
     
-    if (lessonIndex === -1) {
+    if (!lesson) {
       return NextResponse.json({ error: 'Lesson not found' }, { status: 404 })
     }
 
-    serverLessons.splice(lessonIndex, 1)
-    return NextResponse.json({ success: true })
+    // For pre-built lessons, we won't actually delete them
+    // In a real app, you might want to allow deletion of custom lessons
+    return NextResponse.json({ 
+      success: true,
+      message: 'Lesson would be deleted (pre-built lessons are protected)'
+    })
   } catch (error) {
     return NextResponse.json(
       { error: 'Internal server error' },
