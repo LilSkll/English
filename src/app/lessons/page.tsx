@@ -105,19 +105,19 @@ export default function LessonsPage() {
       {/* Lessons Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {lessons.map((lesson) => (
-          <Card key={lesson.id} className="hover:shadow-lg transition-shadow">
+          <Card key={lesson.id} className="hover:shadow-lg transition-shadow border-gray-200">
             <CardHeader>
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <CardTitle className="text-lg flex items-center gap-2">
-                    <span className="bg-blue-100 text-blue-800 text-sm font-medium px-2 py-1 rounded">
+                    <span className="bg-blue-100 text-blue-800 text-sm font-medium px-2 py-1 rounded border border-blue-200">
                       Unit {lesson.unit}
                     </span>
                     {lesson.completed && (
                       <CheckCircle className="h-5 w-5 text-green-600" />
                     )}
                   </CardTitle>
-                  <CardDescription className="mt-2">
+                  <CardDescription className="mt-2 text-gray-700">
                     {lesson.title}
                   </CardDescription>
                 </div>
@@ -133,7 +133,7 @@ export default function LessonsPage() {
               </div>
 
               {/* Stats */}
-              <div className="flex items-center justify-between text-sm text-gray-500">
+              <div className="flex items-center justify-between text-sm text-gray-600">
                 <div className="flex items-center gap-1">
                   <BookOpen className="h-4 w-4" />
                   <span>{lesson.exercises.length} exercises</span>

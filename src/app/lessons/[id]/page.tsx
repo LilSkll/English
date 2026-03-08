@@ -199,7 +199,7 @@ export default function LessonPage() {
         </div>
 
         {extraExamples.length > 0 && (
-          <div className="bg-blue-50 p-4 rounded-lg">
+          <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
             <h4 className="font-semibold text-blue-900 mb-2">Extra Examples:</h4>
             <ul className="space-y-1">
               {extraExamples.map((example, index) => (
@@ -232,11 +232,11 @@ export default function LessonPage() {
       <CardContent>
         <div className="space-y-3">
           {lesson.examples.map((example, index) => (
-            <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-              <span className="bg-blue-100 text-blue-800 text-sm font-medium px-2 py-1 rounded">
+            <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+              <span className="bg-blue-100 text-blue-800 text-sm font-medium px-2 py-1 rounded border border-blue-200">
                 {index + 1}
               </span>
-              <p className="flex-1">{example}</p>
+              <p className="flex-1 text-gray-700">{example}</p>
               <Button
                 size="sm"
                 variant="ghost"

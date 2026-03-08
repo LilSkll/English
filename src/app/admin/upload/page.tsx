@@ -128,13 +128,13 @@ export default function AdminUpload() {
 
             {/* Available Units */}
             <div className="space-y-4">
-              <h3 className="font-semibold text-lg">Available Units</h3>
+              <h3 className="font-semibold text-lg text-gray-900">Available Units</h3>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {Array.from({ length: 10 }, (_, i) => i + 1).map((unit) => (
                   <Link key={unit} href={`/lessons/unit-${unit}`}>
-                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer">
-                      <span className="font-medium">Unit {unit}</span>
-                      <span className="text-sm text-blue-600">View →</span>
+                    <div className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 hover:border-blue-300 transition-colors cursor-pointer">
+                      <span className="font-medium text-gray-900">Unit {unit}</span>
+                      <span className="text-sm text-blue-600 font-medium hover:text-blue-700">View →</span>
                     </div>
                   </Link>
                 ))}
@@ -142,7 +142,7 @@ export default function AdminUpload() {
             </div>
 
             {/* Features */}
-            <div className="bg-blue-50 p-4 rounded-lg">
+            <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
               <h4 className="font-semibold text-blue-900 mb-2">Features:</h4>
               <ul className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
                 <li>10 complete grammar units from New Round-Up Starter</li>
@@ -155,7 +155,7 @@ export default function AdminUpload() {
             </div>
 
             {/* Instructions */}
-            <div className="bg-green-50 p-4 rounded-lg">
+            <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
               <h4 className="font-semibold text-green-900 mb-2">How to Use:</h4>
               <ol className="text-sm text-green-800 space-y-1 list-decimal list-inside">
                 <li>Click "View All Lessons" to see all available units</li>
